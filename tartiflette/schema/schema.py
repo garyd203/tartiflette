@@ -120,7 +120,7 @@ class GraphQLSchema:
 
         # Type, directive, enum, scalar & input type definitions
         self.type_definitions: Dict[str, "GraphQLType"] = {}
-        self._directive_definitions: Dict[str, "GraphQLDirective"] = {}
+        self.directive_definitions: Dict[str, "GraphQLDirective"] = {}
         self._scalar_definitions: Dict[str, "GraphQLScalarType"] = {}
         self._enum_definitions: Dict[str, "GraphQLEnumType"] = {}
         self._input_types: List[
@@ -238,19 +238,19 @@ class GraphQLSchema:
         :param directive_definition: GraphQLDirective to add
         :type directive_definition: GraphQLDirective
         """
-        if directive_definition.name in self._directive_definitions:
+        if directive_definition.name in self.directive_definitions:
             raise RedefinedImplementation(
                 "new GraphQL directive definition `{}` "
                 "overrides existing directive definition `{}`.".format(
                     directive_definition.name,
                     repr(
-                        self._directive_definitions.get(
+                        self.directive_definitions.get(
                             directive_definition.name
                         )
                     ),
                 )
             )
-        self._directive_definitions[
+        self.directive_definitions[
             directive_definition.name
         ] = directive_definition
 
@@ -262,7 +262,7 @@ class GraphQLSchema:
         :return: whether or not the name corresponds to a defined directive
         :rtype: bool
         """
-        return name in self._directive_definitions
+        return name in self.directive_definitions
 
     def find_directive(self, name: str) -> "GraphQLDirective":
         """
@@ -272,7 +272,7 @@ class GraphQLSchema:
         :return: the defined directive
         :rtype: GraphQLDirective
         """
-        return self._directive_definitions[name]
+        return self.directive_definitions[name]
 
     def add_scalar_definition(
         self, scalar_definition: "GraphQLScalarType"
@@ -568,7 +568,7 @@ class GraphQLSchema:
             except AttributeError:
                 pass
 
-        for directive in self._directive_definitions.values():
+        for directive in self.directive_definitions.values():
             for arg in directive.arguments.values():
                 errors.extend(
                     self._validate_type_is_an_input_types(
@@ -626,7 +626,7 @@ class GraphQLSchema:
         :rtype: List[str]
         """
         errors = []
-        for directive in self._directive_definitions.values():
+        for directive in self.directive_definitions.values():
             for expected in _IMPLEMENTABLE_DIRECTIVE_HOOKS:
                 attr = getattr(directive.implementation, expected, None)
                 if attr and not is_valid_coroutine(attr):
@@ -912,7 +912,7 @@ class GraphQLSchema:
             if not isinstance(type_definition, GraphQLScalarType):
                 type_definition.bake(self)
 
-        for directive_definition in self._directive_definitions.values():
+        for directive_definition in self.directive_definitions.values():
             directive_definition.bake(self)
 
         for type_definition in self.type_definitions.values():
@@ -956,6 +956,7 @@ class GraphQLSchema:
         self,
         custom_default_resolver: Optional[Callable] = None,
         custom_default_type_resolver: Optional[Callable] = None,
+        run_validation: bool = True,
     ) -> None:
         """
         Bake the final schema (it should not change after this) used for
@@ -983,7 +984,8 @@ class GraphQLSchema:
             # Exceptions should be collected at validation time
             pass
 
-        self._validate()
+        if run_validation:
+            self._validate()
 
         # Bake introspection attributes
         self._operation_types = {
@@ -998,7 +1000,7 @@ class GraphQLSchema:
         self.queryType = self._operation_types["query"]
         self.mutationType = self._operation_types["mutation"]
         self.subscriptionType = self._operation_types["subscription"]
-        self.directives = list(self._directive_definitions.values())
+        self.directives = list(self.directive_definitions.values())
 
         for type_name, type_definition in self.type_definitions.items():
             if not type_name.startswith("__"):
